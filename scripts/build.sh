@@ -85,6 +85,12 @@ if ! git diff-index --quiet HEAD --; then
   exit 1
 fi
 
+# Force a deterministic release string.  An empty .scmversion makes
+# scripts/setlocalversion skip git/hg/svn entirely, so neither "-dirty" nor a
+# "-g<commit>" suffix can leak into kernelrelease.  CONFIG_LOCALVERSION
+# supplies the exact suffix that /vendor/lib/modules expects.
+: > .scmversion
+
 # Use the exact config from the installed LineageOS build.  This is what makes
 # the kernel ABI/vermagic match the vendor modules that stay on the device.
 mkdir -p "$ROOT/out"
