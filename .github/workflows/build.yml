@@ -57,7 +57,7 @@ jobs:
           KERNEL_BRANCH: lineage-24.0
           KERNEL_REF: ${{ inputs.kernel_ref }}
           KSU_VARIANT: ${{ inputs.ksu_variant }}
-          LOCALVERSION: ${{ inputs.localversion }}
+          KERNEL_LOCALVERSION: ${{ inputs.localversion }}
         run: bash scripts/build.sh
 
       - name: Upload artifacts

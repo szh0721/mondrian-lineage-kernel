@@ -8,7 +8,10 @@ KERNEL_REPO="${KERNEL_REPO:-https://github.com/LineageOS/android_kernel_xiaomi_s
 KERNEL_BRANCH="${KERNEL_BRANCH:-lineage-24.0}"
 KERNEL_REF="${KERNEL_REF:-eff4b40407a1b6f1b1ab84554cbb540bcb495175}"
 KSU_VARIANT="${KSU_VARIANT:-BakaSU}"
-LOCALVERSION="${LOCALVERSION:--gki-geff4b40407a1}"
+KERNEL_LOCALVERSION="${KERNEL_LOCALVERSION:--gki-geff4b40407a1}"
+# Do not let the kernel Makefile see a LOCALVERSION environment variable:
+# it would be appended in addition to CONFIG_LOCALVERSION.
+unset LOCALVERSION
 
 CLANG_DIR="${CLANG_DIR:-$ROOT/.clang-r596125}"
 CLANG_URL="${CLANG_URL:-https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android17-release/clang-r596125.tar.gz}"
@@ -80,19 +83,31 @@ make "${MAKE_ARGS[@]}" olddefconfig
 
 # KernelSU is a new symbol, so it is not in the captured config.
 ./scripts/config --file "$ROOT/out/.config" -e KSU
-# Keep the exact release string expected by /vendor/lib/modules.
-./scripts/config --file "$ROOT/out/.config" --set-str LOCALVERSION "$LOCALVERSION"
-./scripts/config --file "$ROOT/out/.config" -d LOCALVERSION_AUTO
+# Resolve KSU and any new symbols first.  Set the release string afterwards so
+# a later olddefconfig cannot put CONFIG_LOCALVERSION_AUTO back.
 make "${MAKE_ARGS[@]}" olddefconfig
+
+# Keep the exact release string expected by /vendor/lib/modules.
+./scripts/config --file "$ROOT/out/.config" --set-str LOCALVERSION "$KERNEL_LOCALVERSION"
+./scripts/config --file "$ROOT/out/.config" -d LOCALVERSION_AUTO
 
 if ! grep -q '^CONFIG_KSU=y' "$ROOT/out/.config"; then
   echo "CONFIG_KSU was not enabled" >&2
   grep -n 'KSU' "$ROOT/out/.config" >&2 || true
   exit 1
 fi
+if ! grep -qx "CONFIG_LOCALVERSION=\"$KERNEL_LOCALVERSION\"" "$ROOT/out/.config"; then
+  echo "CONFIG_LOCALVERSION was not set as expected" >&2
+  grep -n 'CONFIG_LOCALVERSION' "$ROOT/out/.config" >&2 || true
+  exit 1
+fi
+if grep -q '^CONFIG_LOCALVERSION_AUTO=y' "$ROOT/out/.config"; then
+  echo "CONFIG_LOCALVERSION_AUTO is still enabled" >&2
+  exit 1
+fi
 
 BASE_VERSION="$(awk '/^VERSION[[:space:]]*=/{v=$3} /^PATCHLEVEL[[:space:]]*=/{p=$3} /^SUBLEVEL[[:space:]]*=/{s=$3} END{print v"."p"."s}' Makefile)"
-EXPECTED_RELEASE="${BASE_VERSION}${LOCALVERSION}"
+EXPECTED_RELEASE="${BASE_VERSION}${KERNEL_LOCALVERSION}"
 ACTUAL_RELEASE="$(make -s "${MAKE_ARGS[@]}" kernelrelease | tail -n1)"
 log "kernel release: $ACTUAL_RELEASE (expected: $EXPECTED_RELEASE)"
 if [ "$ACTUAL_RELEASE" != "$EXPECTED_RELEASE" ]; then
