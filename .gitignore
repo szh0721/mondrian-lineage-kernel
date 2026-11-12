@@ -1,0 +1,10 @@
+out/
+kernel/
+ak3/
+.clang-r596125/
+clang-r596125.tar.gz
+Image
+Image.sha256
+kernel.config
+build.log
+AnyKernel3-*.zip

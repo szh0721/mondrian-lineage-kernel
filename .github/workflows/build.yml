@@ -1,0 +1,75 @@
+name: Build LineageOS 24 kernel (mondrian)
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_ref:
+        description: "LineageOS kernel commit (lineage-24.0)"
+        required: true
+        default: "eff4b40407a1b6f1b1ab84554cbb540bcb495175"
+      ksu_variant:
+        description: "KernelSU variant"
+        required: true
+        type: choice
+        options:
+          - BakaSU
+          - Official
+          - SukiSU
+        default: BakaSU
+      localversion:
+        description: "Kernel localversion (must match vendor modules)"
+        required: true
+        default: "-gki-geff4b40407a1"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: "5.10.269 / ${{ inputs.ksu_variant }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Checkout build repo
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/share/swift
+          sudo apt-get clean
+          df -h
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -o Acquire::Retries=5
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential ccache cpio flex git kmod \
+            libelf-dev libssl-dev lz4 python3 rsync unzip xz-utils zip zstd dwarves
+
+      - name: Build kernel and AnyKernel3
+        env:
+          KERNEL_REPO: https://github.com/LineageOS/android_kernel_xiaomi_sm8450.git
+          KERNEL_BRANCH: lineage-24.0
+          KERNEL_REF: ${{ inputs.kernel_ref }}
+          KSU_VARIANT: ${{ inputs.ksu_variant }}
+          LOCALVERSION: ${{ inputs.localversion }}
+        run: bash scripts/build.sh
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mondrian-lineage-${{ github.run_number }}
+          path: |
+            Image
+            Image.sha256
+            kernel.config
+            AnyKernel3-mondrian-lineage.zip
+            build.log
+          if-no-files-found: warn
+          retention-days: 14
