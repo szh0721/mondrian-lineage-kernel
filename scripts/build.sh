@@ -114,6 +114,10 @@ make "${MAKE_ARGS[@]}" olddefconfig
 # Keep the exact release string expected by /vendor/lib/modules.
 ./scripts/config --file "$ROOT/out/.config" --set-str LOCALVERSION "$KERNEL_LOCALVERSION"
 ./scripts/config --file "$ROOT/out/.config" -d LOCALVERSION_AUTO
+# Full LTO of vmlinux.o with DWARF debug info is what pushes the 16 GB
+# GitHub-hosted runner into swap and gets it shut down.  Debug info is not
+# part of the boot Image and does not affect vermagic/CRCs, so drop it.
+./scripts/config --file "$ROOT/out/.config" -d DEBUG_INFO -d DEBUG_INFO_DWARF4 -d DEBUG_INFO_BTF
 
 if ! grep -q '^CONFIG_KSU=y' "$ROOT/out/.config"; then
   echo "CONFIG_KSU was not enabled" >&2
@@ -142,6 +146,10 @@ if ! grep -qx "CONFIG_LOCALVERSION=\"$KERNEL_LOCALVERSION\"" "$ROOT/out/include/
 fi
 if grep -q '^CONFIG_LOCALVERSION_AUTO=y' "$ROOT/out/include/config/auto.conf"; then
   echo "auto.conf still has CONFIG_LOCALVERSION_AUTO=y" >&2
+  exit 1
+fi
+if grep -q '^CONFIG_DEBUG_INFO=y' "$ROOT/out/.config"; then
+  echo "CONFIG_DEBUG_INFO was re-enabled; LTO link will be too large" >&2
   exit 1
 fi
 
