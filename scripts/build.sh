@@ -67,6 +67,24 @@ case "$KSU_VARIANT" in
     ;;
 esac
 
+# BakaSU/KernelSU modify tracked files in the kernel tree.  setlocalversion
+# appends "-dirty" whenever `git diff-index` is not clean, even with
+# CONFIG_LOCALVERSION_AUTO=n, which breaks the exact release string that the
+# prebuilt vendor modules expect.  Commit those tracked changes so the tree is
+# clean before the release check.
+if ! git diff-index --quiet HEAD --; then
+  log "Committing kernel patches so localversion stays clean"
+  git add -u
+  git -c user.name="LineageOS Kernel Builder" \
+      -c user.email="kernel-builder@localhost" \
+      commit -m "Add $KSU_VARIANT"
+fi
+if ! git diff-index --quiet HEAD --; then
+  echo "kernel tree is still dirty after committing patches" >&2
+  git status --short --untracked-files=no >&2
+  exit 1
+fi
+
 # Use the exact config from the installed LineageOS build.  This is what makes
 # the kernel ABI/vermagic match the vendor modules that stay on the device.
 mkdir -p "$ROOT/out"
