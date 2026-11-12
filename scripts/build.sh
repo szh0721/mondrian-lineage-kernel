@@ -130,6 +130,21 @@ if grep -q '^CONFIG_LOCALVERSION_AUTO=y' "$ROOT/out/.config"; then
   exit 1
 fi
 
+# kernelrelease reads include/config/auto.conf, not .config.  Regenerate it so
+# the LOCALVERSION value above actually reaches the release string.
+log "Syncing include/config/auto.conf"
+make "${MAKE_ARGS[@]}" syncconfig
+
+if ! grep -qx "CONFIG_LOCALVERSION=\"$KERNEL_LOCALVERSION\"" "$ROOT/out/include/config/auto.conf"; then
+  echo "auto.conf has the wrong CONFIG_LOCALVERSION" >&2
+  grep -n 'CONFIG_LOCALVERSION' "$ROOT/out/include/config/auto.conf" >&2 || true
+  exit 1
+fi
+if grep -q '^CONFIG_LOCALVERSION_AUTO=y' "$ROOT/out/include/config/auto.conf"; then
+  echo "auto.conf still has CONFIG_LOCALVERSION_AUTO=y" >&2
+  exit 1
+fi
+
 BASE_VERSION="$(awk '/^VERSION[[:space:]]*=/{v=$3} /^PATCHLEVEL[[:space:]]*=/{p=$3} /^SUBLEVEL[[:space:]]*=/{s=$3} END{print v"."p"."s}' Makefile)"
 EXPECTED_RELEASE="${BASE_VERSION}${KERNEL_LOCALVERSION}"
 ACTUAL_RELEASE="$(make -s "${MAKE_ARGS[@]}" kernelrelease | tail -n1)"
